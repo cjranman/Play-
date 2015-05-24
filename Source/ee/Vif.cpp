@@ -1002,17 +1002,29 @@ void CVif::CFifoStream::Reset()
 
 void CVif::CFifoStream::Read(void* buffer, uint32 size)
 {
-	assert(m_source != NULL);
+	assert(m_source != nullptr);
+	if(buffer == nullptr)
+	{
+		m_bufferPosition += size;
+		if(m_bufferPosition >= 0x10)
+		{
+			m_nextAddress += (m_bufferPosition - 0x10);
+			m_bufferPosition = 0x10;
+			if(m_nextAddress < m_endAddress)
+			{
+				//Still more stuff to be read
+				SyncBuffer();
+			}
+		}
+		return;
+	}
 	uint8* readBuffer = reinterpret_cast<uint8*>(buffer);
 	while(size != 0)
 	{
 		SyncBuffer();
 		uint32 read = std::min<uint32>(size, BUFFERSIZE - m_bufferPosition);
-		if(readBuffer != NULL)
-		{
-			memcpy(readBuffer, reinterpret_cast<uint8*>(&m_buffer) + m_bufferPosition, read);
-			readBuffer += read;
-		}
+		memcpy(readBuffer, reinterpret_cast<uint8*>(&m_buffer) + m_bufferPosition, read);
+		readBuffer += read;
 		m_bufferPosition += read;
 		size -= read;
 	}
@@ -1041,6 +1053,15 @@ void CVif::CFifoStream::SetDmaParams(uint32 address, uint32 size, bool tagInclud
 	m_endAddress = address + size;
 	m_tagIncluded = tagIncluded;
 	SyncBuffer();
+}
+
+uint8* CVif::CFifoStream::GetDirectDataPtr() const
+{
+	//Only works if we're aligned to 128-bits
+	assert(m_tagIncluded == false);
+	assert((m_nextAddress & 0xF) == 0);
+	assert((m_bufferPosition & 0xF) == 0);
+	return m_source + (m_nextAddress - (0x10 - m_bufferPosition));
 }
 
 uint32 CVif::CFifoStream::GetAvailableReadBytes() const

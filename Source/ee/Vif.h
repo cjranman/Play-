@@ -59,6 +59,7 @@ protected:
 		void					Flush();
 		void					Align32();
 		void					SetDmaParams(uint32, uint32, bool);
+		uint8*					GetDirectDataPtr() const;
 
 	private:
 		void					SyncBuffer();
